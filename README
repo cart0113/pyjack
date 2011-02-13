@@ -1,0 +1,26 @@
+mod2doctest
+===========
+
+mod2doctest is a module that converts a python module to a doctest 
+compatible docstring.  
+
+It's kind of like taking a python script, pasting it into an interactive
+interpreter and then copying the output back into a docstring.  
+
+However, mod2doctest has many convenience to make this process easier like: 
+  
+  * Providing `#>` and `#|` comments: `#>` prints to both your docstring
+    and stdout and `#|` print just to your docstring (which will show
+    up as text in a sphinx generated webpage)
+  
+  * adding ellipse markers for memory id / trace back 
+  
+  * Cleaning up / formatting your docstring for sphinx inclusion 
+  
+  * and a couple of other things, too.
+    
+For full documentation and several examples please visit 
+http://packages.python.org/mod2doctest/.
+ 
+ 
+ 

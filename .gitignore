@@ -1,0 +1,12 @@
+
+.project*
+.pydev*
+.settings*
+
+build/*
+doc/build/*
+dist/*
+mod2doctest*egg*/
+
+*.pyc
+*~
