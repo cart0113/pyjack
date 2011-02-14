@@ -1,0 +1,5 @@
+#!/bin/sh
+cd /home/ajcarter/workspace/GIT_PYJACK
+# upload docs
+/usr/local/bin/python2.6 setup.py build_sphinx
+/usr/local/bin/python2.6 setup.py upload_sphinx
