@@ -1,0 +1,22 @@
+#!/bin/sh
+cd /home/ajcarter/workspace/GIT_PYJACK
+rm -rf build/ dist/ pyjack.egg-info/ *pyc
+# make the eggs
+/usr/local/bin/python2.4 setup.py bdist_egg register upload --identity="Andrew Carter" --sign --quiet
+/usr/local/bin/python2.5 setup.py bdist_egg register upload --identity="Andrew Carter" --sign --quiet
+/usr/local/bin/python2.6 setup.py bdist_egg register upload --identity="Andrew Carter" --sign --quiet
+/usr/local/bin/python2.7 setup.py bdist_egg register upload --identity="Andrew Carter" --sign --quiet
+# windows exe
+/usr/local/bin/python2.4 setup.py bdist_wininst --target-version=2.4 register upload --identity="Andrew Carter" --sign --quiet
+/usr/local/bin/python2.5 setup.py bdist_wininst --target-version=2.5 register upload --identity="Andrew Carter" --sign --quiet
+/usr/local/bin/python2.6 setup.py bdist_wininst --target-version=2.6 register upload --identity="Andrew Carter" --sign --quiet
+/usr/local/bin/python2.7 setup.py bdist_wininst --target-version=2.7 register upload --identity="Andrew Carter" --sign --quiet
+# 64 bit
+/usr/local/bin/python2.6.64 setup.py bdist_wininst --target-version=2.6 register upload --identity="Andrew Carter" --sign --quiet
+/usr/local/bin/python2.7.64 setup.py bdist_wininst --target-version=2.7 register upload --identity="Andrew Carter" --sign --quiet
+# source code
+/usr/local/bin/python2.6 setup.py sdist --formats="gztar,zip" register upload --identity="Andrew Carter" --sign
+# upload docs
+/usr/local/bin/python2.6 setup.py build_sphinx
+/usr/local/bin/python2.6 setup.py upload_sphinx
+pause
