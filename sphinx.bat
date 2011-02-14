@@ -1,13 +1,13 @@
-set HOME=C:\Users\Owner
-rd /S /Q C:\eclipse\workspace\GIT_MOD2DOCTEST\doc\build\doctrees
-rd /S /Q C:\eclipse\workspace\GIT_MOD2DOCTEST\doc\build\html
+set HOME=C:\cygwin\home\ajcarter
+rd /S /Q C:\workspace\GIT_PYJACK\doc\build\doctrees
+rd /S /Q C:\workspace\GIT_PYJACK\doc\build\html
 
 rem LOCAL DOCS
-C:\Python26\scripts\sphinx-build.exe -b html C:\eclipse\workspace\GIT_MOD2DOCTEST\doc\source C:\eclipse\workspace\GIT_MOD2DOCTEST\doc\build\html
+C:\Python26\scripts\sphinx-build.exe -b html C:\workspace\GIT_PYJACK\doc\source C:\workspace\GIT_PYJACK\doc\build\html
 
 rem UPLOAD DOCS
-cd C:\eclipse\workspace\GIT_MOD2DOCTEST
-C:\Python26\python.exe setup.py build_sphinx
-C:\Python26\python.exe setup.py upload_sphinx
+rem cd C:\workspace\GIT_PYJACK
+rem C:\Python26\python.exe setup.py build_sphinx
+rem C:\Python26\python.exe setup.py upload_sphinx
 
 pause

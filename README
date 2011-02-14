@@ -1,26 +1,52 @@
-mod2doctest
-===========
+pyjack
+======
 
-mod2doctest is a module that converts a python module to a doctest 
-compatible docstring.  
+pyjack is a small debug / test module that allows you to: 
 
-It's kind of like taking a python script, pasting it into an interactive
-interpreter and then copying the output back into a docstring.  
+* Connect a 'spy' function to almost any python function.  This spy function
+  is called instead of the original function.  The original function is passed
+  to the spy function along with all args, kwargs so you can call the original
+  function; modify the args, kwargs first, print a debug message, then call it; 
+  not call the function, just log it or print a debug message; etc. etc.   
+  
+* Provides a convenience function pyjack.replace_all_refs which uses the gc
+  module to replace all references to an object with references to another 
+  object. 
 
-However, mod2doctest has many convenience to make this process easier like: 
-  
-  * Providing `#>` and `#|` comments: `#>` prints to both your docstring
-    and stdout and `#|` print just to your docstring (which will show
-    up as text in a sphinx generated webpage)
-  
-  * adding ellipse markers for memory id / trace back 
-  
-  * Cleaning up / formatting your docstring for sphinx inclusion 
-  
-  * and a couple of other things, too.
+A quick example::
+
+    >>> import pyjack
+    >>> 
+    >>> def fakeimport(orgopen, *args, **kwargs):
+    ...     
+    ...     print 'Trying to import %s' % args[0]
+    ...     
+    ...     return 'MODULE_%s' % args[0]
+    ... 
+    >>>
+    >>>
+    >>> pyjack.connect(__import__, spyfn=fakeimport)
+    <..._PyjackFuncBuiltin object at 0x...>
+    >>> 
+    >>>
+    >>> import time
+    Trying to import time
+    >>>
+    >>>
+    >>> print time
+    MODULE_time
+    >>> 
+    >>>
+    >>> __import__.restore()
+    >>> 
+    >>> import time
+    >>> print time
+    <module 'time' (built-in)>
+
     
 For full documentation and several examples please visit 
-http://packages.python.org/mod2doctest/.
+http://packages.python.org/pyjack/.
+
  
  
  

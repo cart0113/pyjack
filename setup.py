@@ -5,19 +5,21 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(
-    name = "mod2doctest",
+    name = "pyjack",
     version = "0.3.0",
     author = "Andrew Carter",
     author_email = "andrewjcarter@gmail.com",
-    description = "Tools to attach filter/callback functions to functions.",
+    description = ("Tools to attach spy functions to functions and replace "
+                   "object references with new references"),
     license = "MIT",
-    keywords = "debug callback profile",
+    keywords = "debug callback test monkey monkey-patch",
     url = "http://packages.python.org/pyjack/",
-    packages=['mod2doctest'],
     long_description=read('README'),
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Topic :: Utilities",
         "License :: OSI Approved :: MIT License",
     ],
+    py_modules=['pyjack'],
+    zip_safe=True,
 )

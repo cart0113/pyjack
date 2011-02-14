@@ -5,54 +5,239 @@ if __name__ == '__main__':
                         run_doctest=False,)
     
     
-#>Basic idea: pyjacking a function
+#>Some examples of connecting to functions
 #>------------------------------------------------------------------------------
 
-#|A couple of quick examples is probably best -- just note 'filters' are called
-#|before a function executes, 'callbacks' are called after a function executes
-#|(unless ``block`` is set ``True``, than the function is never called): 
-
+#>Prevent function from firing
+#>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #|Let's say you want to 1. monitor and 2. prevent every time something is 
 #|opening a file:
 import pyjack
 
-def fakeopen(*args, **kwargs):
-    print 'Someone is trying to open a file with:', args, kwargs
+def fakeopen(orgopen, *args, **kwargs):
+    print 'Here is the org open fn: %r' % orgopen
+    print 'Someone trying to open a file with args:%r kwargs%r' %(args, kwargs,)
     return ()
     
-pyjack.connect(open, callback=fakeopen, block=True)
+pyjack.connect(open, spyfn=fakeopen)
 
 for line in open('/some/path', 'r'):
     print line
 
-#|Or you don't want to block:
+#>Filtering args
+#>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+def absmin(orgmin, seq):
+    return orgmin([abs(x) for x in seq])
+    
+pyjack.connect(min, spyfn=absmin)
+
+print min([-100, 20, -200, 150])
+
+#>Works across memory space
+#>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+#| A major point of pyjack is that all references to the object are updated / 
+#| pyjacked.  So notice below how :func:`time.time` is updated as well as the 
+#| local reference :attr:`timefn`.
+
 import time
+from time import time as timefn
 
-def hitime(*args, **kwargs):
-    print 'Hi, here is the time in seconds since 1970:',
+class MockTime(object):
+    
+    time = -1
+    
+    def __call__(self, orgtime):
+        self.time += 1
+        return self.time
+    
+pyjack.connect(time.time, MockTime())
 
-pyjack.connect(time.time, filter=hitime)
-
+# So the org function is replaced:
+print time.time()
+print time.time()
+print time.time()
 print time.time()
 
-#|Of course, this works on user function / class methods, too:
-def mysort(x, y, z=10):
-    return sorted([x, y, z])
 
-def no_negs(x, y, z):
-    # "filter" functions can return args, kwargs
-    return [abs(x), abs(y), abs(z)], {}
+# But so is the copy:
+print timefn()
+print timefn()
+print timefn()
+print timefn()
+
+
+#>Works on objects (but not slot wrappers)
+#>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+class Foobar(object):
     
-pyjack.connect(mysort, filter=no_negs)
+    def say_hi(self):
+        return 'hi'
+    
 
-mysort(-100, 20, 50)
+foobar = Foobar()
 
-#>So, there you have it: ``filter`` functions are called before orginal 
-#>function execution and can alter args, kwargs.  ``callbacks`` are called 
-#>after and, if they return non ``None`` values, set the return value. 
+foobar.say_hi()
+
+pyjack.connect(Foobar.say_hi, lambda orgfn, self: 'HI')
+
+foobar.say_hi()
+
+Foobar.say_hi.restore()
+
+foobar.say_hi()
+
+#>Does not work on slot wrappers (like builtin :func:`__init__`, etc.) 
+#>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+def in_init(orgfn, self):
+    print 'in __init__'
+
+try: 
+    pyjack.connect(Foobar.__init__, spyfn=in_init)
+except pyjack.PyjackException, err:
+    print err
+
+#|Do get around this you would need to do:
+
+def my_init(self):
+    pass
+
+Foobar.__init__ = my_init
+
+pyjack.connect(Foobar.__init__, spyfn=in_init)
+
+Foobar()
+
+#|But by this point, you really don't need pyjack anymore anyway, but just 
+#|showing for completeness. 
 
 
-print    
+#>Using :func:`replace_all_refs`
+#>------------------------------------------------------------------------------
+
+#|This is just to show how :func:`replace_all_refs` works across a large, 
+#|nested memory space. 
+
+#|.. note::
+#|  
+#|   Currently, pyjack does not work within function closures that use the
+#|   :class:`cell` readonly data structure. At this time, this is the only 
+#|   known exception. 
+
+#|Let's take a simple iterable
+
+iterable = [1, 2, 3, 4]
+
+#| And to really make it weird, make it circular: 
+
+iterable.append({'theiterable': iterable})
+
+#| Now create a closure (pyjack can't work on closures, and we'll show that): 
+
+def myfun(iterable):
+    
+    myiterable = iterable
+    
+    anotheriterable = (iterable, 'x', 'y', 'z')
+    
+    def innerfun():
+        yield myiterable
+        yield anotheriterable
+            
+    return innerfun
+
+#| And stick it in a class, too: 
+
+class SomeCls(object):
+    
+    iscls = True
+    
+    someiterable = iterable
+    anotheriterable = (iterable, 'x', 'y', 'z',)
+
+
+#>Now let's gander at some results: 
+innerfun = myfun(iterable)
+
+#>So look at the org results
+print "iterable:", iterable
+print "SomeCls.someiterable:", SomeCls.someiterable
+print "SomeCls.anotheriterable:", SomeCls.anotheriterable
+print "Contents of innerfun:"
+
+#|And inner fun: 
+innerfun_gen = innerfun()
+print "First yield:", innerfun_gen.next()
+print "Second yield:", innerfun_gen.next()
+
+#>Now, let's replace iterable with some new data
+new_iterable = ('new', 'data', 'set',)
+org_iterable = pyjack.replace_all_refs(iterable, new_iterable)
+
+#>Then look at the new results
+print "iterable:", iterable
+print "SomeCls.someiterable:", SomeCls.someiterable
+print "SomeCls.anotheriterable:", SomeCls.anotheriterable
+
+#> And inner fun, notice pyjack here does not work: 
+innerfun_gen = innerfun()
+print "First yield:", innerfun_gen.next()
+print "Second yield:", innerfun_gen.next()
+
+
+#>Some bigger examples to make sure :mod:`gc` does not implode
+#>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+import random
+
+random = random.Random(0)
+
+obj = {'x': 10, 'y': [10, 20, 30,]}
+       
+mylist = []
+
+for i in xrange(100000):
+
+    if i % 10000 == 0:
+        mylist.append(obj)
+    elif i % 10000 == 1:
+        mylist.append((obj, obj,))
+    else:
+        mylist.append(random.randint(0, 1e6))
+        
+#> Org list:
+print mylist[10000]
+print mylist[10001]
+print mylist[10002]
+print mylist[50000]
+print mylist[50001]
+print mylist[50002]
+
+obj = pyjack.replace_all_refs(obj, [])
+
+#> New list:
+print mylist[10000]
+print mylist[10001]
+print mylist[10002]
+print mylist[50000]
+print mylist[50001]
+print mylist[50002]
+
+#> And final check:
+print obj
+
+
+
+
+
+
+    
+    
+    
+    
+
+
 
 
 

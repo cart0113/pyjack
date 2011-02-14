@@ -1,88 +1,144 @@
 import sys as _sys
 import gc as _gc
 import types as _types
+import inspect as _inspect
 
 
 _WRAPPER_TYPES = (type(object.__init__), type(object().__init__),)
 
 
-class Exception(Exception): pass
+class PyjackException(Exception): pass
 
 
-def connect(fn, filter=None, callback=None, block=False, passfn=False):    
+def connect(fn, spyfn):    
     """
-    :summary:         Connects a filter/callback function to a function/method.
+    :summary: Connects a filter/callback function to a function/method.
                       
-    :param fn:        The function which to connect.  Omitted when used as 
-                      a decorator. 
+    :param fn: The function which to pyjack.
+    :type fn:  :class:`types.FunctionType`, :class:`types.MethodType`, 
+               :class:`types.BuiltinFunctionType`, or
+               :class:`BuiltinMethodType` functions. 
         
-    :param filter:    A filter function that is called *before* the ``fn`` 
-                      function is called.  This function must return an 
-                      ``(args, kwargs,)`` tuple that will be the args, kwargs 
-                      passed to the original ``fn``. This way, you either 
-                      pass the args, kwargs to the ``fn`` untouched or you 
-                      can first 'filter' the arguments passed to ``fn``.
-    :type filter:     callable. 
-
-    :param callback:  A callback function that will be called *after* the ``fn`` 
-                      function is called.  Finally, if this callback function 
-                      returns anything other than ``None``, it's value will be 
-                      returned instead of the value of the original ``fn`` 
-                      function. 
-    :type callback:   callable
-    
-    :param block:     If ``True``, this will block the original ``fn`` 
-                      from being called.         
-    :type block:      ``True`` or ``False``
-
-    :param passfn:    If ``True``, the org fn will be passed to filter/callback.      
-    :type passfn:     ``True`` or ``False``
+    :param spyfn: Any callable.  It will be passed the orignal :attr:`fn`
+                  and then any args, kwargs that were passed to the 
+                  original :attr:`fn`. 
+    :type spyfn:  callable. 
         
-    :returns:         The new function. 
+    :returns: The new pyjacked function.  Note, this function object
+              has a :func:`restore` that can be called to remove the
+              pyjack filters/callbacks. 
                       
-    :raises:          :class:`PyjackError`
+    :raises: :class:`PyjackException`
 
     """
     
     fn_type = type(fn)
 
     if issubclass(fn_type, _types.FunctionType):
-        newfn = _PyjackFuncCode(fn, filter, callback, block, passfn)
+        return _PyjackFuncCode(fn, spyfn)._fn
     elif issubclass(fn_type, _types.MethodType):
-        newfn = _PyjackFuncCode(fn.im_func)
+        return _PyjackFuncCode(fn.im_func, spyfn)._fn
     elif issubclass(fn_type, (_types.BuiltinFunctionType, 
                               _types.BuiltinMethodType,)):
-        newfn = _PyjackFuncBuiltin(fn, filter, callback, block, passfn)
+        return _PyjackFuncBuiltin(fn, spyfn)
     elif issubclass(fn_type, _WRAPPER_TYPES):
-        raise Exception("Wrappers not supported. Make a concrete fn.")
+        raise PyjackException("Wrappers not supported. Make a concrete fn.")
     else:
-        raise Exception("'r' not supported" % fn_type)
+        raise PyjackException("'r' not supported" % fn_type)
     
-    return newfn.fn
-
 
 def restore(fn):
+    """
+    :summary:  Fully restores function back to original state. 
+                      
+    :param fn: The pyjacked function returned by :func:`connect`. 
+    
+    .. note::
+    
+       Any pyjacked function has a :func:`restore` method, too.  So you can 
+       call that instead of this procedural function -- it's up to you.     
+        
+    """
     fn.restore()
 
 
+# SOMETHING BROKEN IN TYPES MODULE
 def replace_all_refs(org_obj, new_obj):
+    """
+    :summary: Uses the :mod:`gc` module to replace all references to obj
+              :attr:`org_obj` with :attr:`new_obj` (it tries it's best, 
+              anyway). 
+                      
+    :param org_obj: The obj you want to replace. 
+    
+    :param new_obj: The new_obj you want in place of the old obj. 
+    
+    :returns: The org_obj
+    
+    Use looks like:
+    
+    >>> import pyjack
+    >>> x = ('org', 1, 2, 3)
+    >>> y = x
+    >>> z = ('new', -1, -2, -3)
+    >>> org_x = pyjack.replace_all_refs(x, z)
+    >>> print x
+    ('new', -1, -2, -3)    
+    >>> print y 
+    ('new', -1, -2, -3)    
+    >>> print org_x 
+    ('org', 1, 2, 3)
+
+    To reverse the process, do something like this:
+
+    >>> z = pyjack.replace_all_refs(z, org_x)
+    >>> del org_x
+    >>> print x
+    ('org', 1, 2, 3)
+    >>> print y 
+    ('org', 1, 2, 3)
+    >>> print z
+    ('new', -1, -2, -3)    
+        
+    .. note:
+        The obj returned is, by the way, the last copy of :attr:`org_obj` in 
+        memory; if you don't save a copy, there is no way to put state of the 
+        system back to original state.     
+    
+    .. warning:: 
+       
+       This function does not work reliably on strings, due to how the 
+       Python runtime interns strings. 
+        
+    """
 
     _gc.collect()
-
+    
     hit = False    
     for referrer in _gc.get_referrers(org_obj):
 
         # DICTS
         if isinstance(referrer, dict):
-            for key, value in referrer.iteritems():
+
+            cls = None
+
+            if '__dict__' in referrer and '__weakref__' in referrer:
+                for cls in _gc.get_referrers(referrer):
+                    if _inspect.isclass(cls) and cls.__dict__ == referrer:
+                        break
+            
+            for key, value in referrer.items():
                 if value is org_obj:
                     hit = True
                     referrer[key] = new_obj
-        
+                    if cls:
+                        setattr(cls, key, new_obj)
+                        
+                                                
         # LISTS
         elif isinstance(referrer, list):
-            for i, value in enumerate(referrer):
-                if value is fn:
+            for i, value in enumerate(referrer[:]):
+                if value is org_obj:
                     hit = True
                     referrer[i] = new_obj
         
@@ -92,6 +148,24 @@ def replace_all_refs(org_obj, new_obj):
             referrer.add(new_obj)
             hit = True
 
+        elif isinstance(referrer, (tuple, frozenset,)):
+            new_tuple = []
+            for obj in referrer:
+                if obj is org_obj:
+                    new_tuple.append(new_obj)
+                else:
+                    new_tuple.append(obj)
+            replace_all_refs(referrer, type(referrer)(new_tuple))
+        
+        elif str(type(referrer)).lower() ==  "<type 'cell'>":
+            #print type(referrer).__module__
+            #type(referrer)(cell_list=org_obj)
+            #for x in _gc.get_referrers(referrer):
+            #    print x
+            pass
+        elif not isinstance(referrer, _types.FrameType):
+            print referrer
+            
     if hit is False:
         raise AttributeError("Object '%r' not found" % org_obj)
 
@@ -103,44 +177,21 @@ def _get_self():
 
     global _func_code_map
     
-    frame = _sys._getframe()
+    frame = _inspect.currentframe()
     code = frame.f_back.f_code
     return _func_code_map[code]
 
 
-class _PyjackFunc(object):
+class _PyjackFunc(object): pass
+        
 
-    def __init__(self, fn, filter, callback, block, passfn):
-                
-        self.fn = fn
-        self._filter = filter
-        self._callback = callback
-        self._block = block
-        self._passfn = passfn
-
-    @staticmethod    
-    def _call(fn, filter, callback, block, passfn, args, kwargs):
-        if passfn:
-            args = [fn] + list(args)
-        if filter:
-            args, kwargs = filter(*args, **kwargs) or (args, kwargs)
-        value = None
-        if not block:
-            value = fn(*args, **kwargs)
-        if callback:
-            newvalue = callback(*args, **kwargs)
-            return newvalue if newvalue is not None else value
-        else:
-            return value
-
-    
 class _PyjackFuncCode(_PyjackFunc):
             
-    def __init__(self, fn, filter, callback, block, passfn):
+    def __init__(self, fn, spyfn):
 
         global _func_code_map
                 
-        _PyjackFunc.__init__(self, fn, filter, callback, block, passfn)
+        self._fn, self._spyfn = fn, spyfn
               
         def proxy(*args, **kwargs):
             import pyjack
@@ -155,31 +206,37 @@ class _PyjackFuncCode(_PyjackFunc):
         fn.restore = self.restore
 
     def _process_fn(self, args, kwargs):
-        self.fn.func_code = self._org_func_code
-        value = self._call(
-            self.fn, self._filter, self._callback, self._block, self._passfn, 
-            args, kwargs)
-        self.fn.func_code = self._proxy_func_code
-        return value 
+        self._fn.func_code = self._org_func_code
+        value = self._spyfn(self._fn, *args, **kwargs)
+        self._fn.func_code = self._proxy_func_code
+        return value
     
     def restore(self):
-        self.fn.func_code = self._org_func_code
+        self._fn.func_code = self._org_func_code
         
 
 class _PyjackFuncBuiltin(_PyjackFunc):
         
-    def __init__(self, fn, filter, callback, block, passfn):
-        _PyjackFunc.__init__(self, fn, filter, callback, block, passfn)
-        self.fn = replace_all_refs(fn, self)
+    def __init__(self, fn, spyfn):
+        self._fn = replace_all_refs(fn, self)
+        self._spyfn = spyfn
 
     def __call__(self, *args, **kwargs):
-        return self._call(
-            self.fn, self._filter, self._callback, self._block, self._passfn, 
-            args, kwargs)
+        return self._spyfn(self._fn, *args, **kwargs)
                 
+    def __getattr__(self, attr):
+        try:
+            return getattr(self._fn, attr)
+        except AttributeError:
+            bundle = (self._fn, attr,)
+            raise AttributeError("function %r has no attr '%s'" % bundle)
+    
     def restore(self):
-        replace_all_refs(self, self.fn)
+        replace_all_refs(self, self._fn)
         
 
-
-
+if __name__ == '__main__':
+    
+    import doctest
+    doctest.testmod(optionflags=524)
+    

@@ -1,0 +1,26 @@
+/**
+ * libdev style sheet.
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ */
+
+@import url("nature.css");
+
+li {
+    padding-bottom: 5px;
+}
+
+a.reference {
+    font-style: normal;
+}
+
+a.external {
+    font-style: normal;
+}
+
+em {
+    font-style: normal;
+}
+
+dl.class {
+    background-color: #EEEEFF;
+}

@@ -1,0 +1,9 @@
+README
+pyjack.py
+setup.cfg
+setup.py
+pyjack.egg-info/PKG-INFO
+pyjack.egg-info/SOURCES.txt
+pyjack.egg-info/dependency_links.txt
+pyjack.egg-info/top_level.txt
+pyjack.egg-info/zip-safe
