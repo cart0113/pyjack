@@ -19,4 +19,3 @@ rm -rf build/ dist/ pyjack.egg-info/ *pyc
 # upload docs
 /usr/local/bin/python2.6 setup.py build_sphinx
 /usr/local/bin/python2.6 setup.py upload_sphinx
-pause
