@@ -92,8 +92,14 @@ or::
 
     easy_install pyjack 
 
-Or, grab the windows installer, egg, or source from 
-http://pypi.python.org/pypi/pyjack/.
+Or, grab the windows installer, egg, or source from:
+
+* http://pypi.python.org/pypi/pyjack/.
+
+Or, grab the source code from: 
+
+* https://github.com/cart0113/pyjack 
+
 
 :mod:`pyjack`
 =============
