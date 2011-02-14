@@ -45,9 +45,15 @@ Basically, what does it do?
   This is done so *all* references to the function are altered. 
   
 * For builtin functions, the :func:`replace_all_refs` is used.  This function
-  uses the :mod:`gc` module to search for all references. 
+  uses the :mod:`gc` module to search for all references. This is because 
+  you can't tinker with a builtin functions :attr:`func_code`.  
   
-The basic idea is that code like this::
+Updating the :attr:`func_code` is preferred because it is a fast, local 
+operation -- :func:`replace_all_refs` has to search entire memory space. So 
+the :attr:`func_code` approach is used when possible. 
+  
+The overall idea of pyjack is to update *all* references in memory.  For 
+example, code like this::
 
     def faketime():
         return 0
@@ -59,26 +65,26 @@ The basic idea is that code like this::
 only changes the one reference -- if other references to the original functions
 or objects exist, they are not updated. 
 
-Overall, It's kind of trivial module, but it's proven a useful debug tool to me
-over the years. And while short, the exact mechanics of how to replace *all* 
-references to a function / object in memory might be useful for someone looking 
-to do something similar. 
+Overall, It's kind of trivial module, but it's proven a useful from time to
+time. And while short, the exact mechanics of the receipe of how to replace 
+*all* references to a function / object in memory might be useful for someone 
+looking to do something similar. 
 
 
 .. note::
 
    :func:`connect` and :func:`replace_all_refs` can not work on objects in 
-   func_closure since objects there are of :class:`cell` type and cannot be 
-   modified. 
+   a :attr:`func_closure` since objects there are of :class:`cell` type and 
+   cannot be modified. 
 
    
 
 .. note::
 
-   Should it be used in so called "production code"?  Well, it uses the 
-   :mod:`inspect` module and the :mod:`gc` module and uses some pretty low
-   level deep magic to get the job done.  So you get the idea: use at your 
-   own risk (but isn't that always the case?).  
+   Should it be used in so called "production code"?  Well, the :mod:`inspect` 
+   module and the :mod:`gc` module and used and some low level objects 
+   attributes are tinkered with.  So you get the idea: use at your own risk 
+   (but isn't that always the case?).  
      
 
 Installation for Python 2.4 through 2.7

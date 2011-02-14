@@ -1,4 +1,4 @@
-if __name__ == '__main__':
+if __name__ == '__main__d':
     import mod2doctest
     mod2doctest.convert(r'C:\Python26\python.exe', src=True,
                         add_autogen=False, target='_doctest',
@@ -18,7 +18,7 @@ def fakeopen(orgopen, *args, **kwargs):
     print 'Here is the org open fn: %r' % orgopen
     print 'Someone trying to open a file with args:%r kwargs%r' %(args, kwargs,)
     return ()
-    
+
 pyjack.connect(open, spyfn=fakeopen)
 
 for line in open('/some/path', 'r'):

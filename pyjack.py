@@ -33,7 +33,6 @@ def connect(fn, spyfn):
     """
     
     fn_type = type(fn)
-
     if issubclass(fn_type, _types.FunctionType):
         return _PyjackFuncCode(fn, spyfn)._fn
     elif issubclass(fn_type, _types.MethodType):
@@ -43,8 +42,12 @@ def connect(fn, spyfn):
         return _PyjackFuncBuiltin(fn, spyfn)
     elif issubclass(fn_type, _WRAPPER_TYPES):
         raise PyjackException("Wrappers not supported. Make a concrete fn.")
+    elif _sys.version_info < (2, 5) and issubclass(fn_type, type(file)):
+        # in python 2.4, open is of type file, not :class:`types.FunctionType`
+        return _PyjackFuncBuiltin(fn, spyfn)
     else:
-        raise PyjackException("'r' not supported" % fn_type)
+        bundle = (fn, fn_type,)
+        raise PyjackException("fn %r of type '%r' not supported" % bundle)
     
 
 def restore(fn):

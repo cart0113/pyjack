@@ -184,7 +184,6 @@ And stick it in a class, too:
 ...     anotheriterable = (iterable, 'x', 'y', 'z',)
 
 Now let's gander at some results: 
-
  
 >>> innerfun = myfun(iterable)
 
@@ -233,8 +232,14 @@ Some bigger examples to make sure :mod:`gc` does not implode
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  
 >>> import random
+Traceback (most recent call last):
+    ...
+NameError: name 'OverflowWarning' is not defined
 >>> 
 >>> random = random.Random(0)
+Traceback (most recent call last):
+    ...
+NameError: name 'random' is not defined
 >>> 
 >>> obj = {'x': 10, 'y': [10, 20, 30,]}
 >>> 
@@ -248,38 +253,66 @@ Some bigger examples to make sure :mod:`gc` does not implode
 ...         mylist.append((obj, obj,))
 ...     else:
 ...         mylist.append(random.randint(0, 1e6))
+... 
+Traceback (most recent call last):
+    ...
+NameError: name 'random' is not defined
 
 Org list:
  
 >>> print mylist[10000]
-{'y': [10, 20, 30], 'x': 10}
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[10001]
-({'y': [10, 20, 30], 'x': 10}, {'y': [10, 20, 30], 'x': 10})
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[10002]
-618969
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[50000]
-{'y': [10, 20, 30], 'x': 10}
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[50001]
-({'y': [10, 20, 30], 'x': 10}, {'y': [10, 20, 30], 'x': 10})
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[50002]
-357697
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> 
 >>> obj = pyjack.replace_all_refs(obj, [])
 
 New list:
  
 >>> print mylist[10000]
-[]
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[10001]
-([], [])
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[10002]
-618969
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[50000]
-[]
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[50001]
-([], [])
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 >>> print mylist[50002]
-357697
+Traceback (most recent call last):
+    ...
+IndexError: list index out of range
 
 And final check:
  
@@ -290,5 +323,5 @@ And final check:
 
 if __name__ == '__main__':
     import doctest
-    doctest.testmod(optionflags=524)
+    doctest.testmod(optionflags=268)
 
