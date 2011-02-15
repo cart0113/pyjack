@@ -230,23 +230,16 @@ Using :func:`replace_all_refs`
 This is just to show how :func:`replace_all_refs` works across a large, 
 nested memory space. 
 
-.. note::
- 
-  Currently, pyjack does not work within function closures that use the
-  :class:`cell` readonly data structure. At this time, this is the only 
-  known exception. 
-
 Let's take a simple iterable
-
  
 >>> iterable = [1, 2, 3, 4]
 
-And to really make it weird, make it circular: 
+And to make it weird, make it circular: 
 
  
 >>> iterable.append({'theiterable': iterable})
 
-Now create a closure (pyjack can't work on closures, and we'll show that): 
+Now create a closure: 
 
  
 >>> def myfun(iterable):
@@ -269,7 +262,7 @@ And stick it in a class, too:
 ...     iscls = True
 ...     
 ...     someiterable = iterable
-...     anotheriterable = (iterable, 'x', 'y', 'z',)
+...     anotheriterable = (iterable, 'x', 'y', 'z', {'innerref': someiterable})
 
 Now let's gander at some results: 
  
@@ -282,7 +275,7 @@ iterable: [1, 2, 3, 4, {'theiterable': [...]}]
 >>> print "SomeCls.someiterable:", SomeCls.someiterable
 SomeCls.someiterable: [1, 2, 3, 4, {'theiterable': [...]}]
 >>> print "SomeCls.anotheriterable:", SomeCls.anotheriterable
-SomeCls.anotheriterable: ([1, 2, 3, 4, {'theiterable': [...]}], 'x', 'y', 'z')
+SomeCls.anotheriterable: ([1, 2, 3, 4, {'theiterable': [...]}], 'x', 'y', 'z', {'innerref': [1, 2, 3, 4, {'theiterable': [...]}]})
 >>> print "Contents of innerfun:"
 Contents of innerfun:
 
@@ -306,15 +299,36 @@ iterable: ('new', 'data', 'set')
 >>> print "SomeCls.someiterable:", SomeCls.someiterable
 SomeCls.someiterable: ('new', 'data', 'set')
 >>> print "SomeCls.anotheriterable:", SomeCls.anotheriterable
-SomeCls.anotheriterable: (('new', 'data', 'set'), 'x', 'y', 'z')
+SomeCls.anotheriterable: (('new', 'data', 'set'), 'x', 'y', 'z', {'innerref': ('new', 'data', 'set')})
 
-And inner fun, notice pyjack here does not work: 
+And inner fun, notice the function closure was updated:
  
 >>> innerfun_gen = innerfun()
 >>> print "First yield:", innerfun_gen.next()
-First yield: [1, 2, 3, 4, {'theiterable': ('new', 'data', 'set')}]
+First yield: ('new', 'data', 'set')
 >>> print "Second yield:", innerfun_gen.next()
-Second yield: ([1, 2, 3, 4, {'theiterable': ('new', 'data', 'set')}], 'x', 'y', 'z')
+Second yield: (('new', 'data', 'set'), 'x', 'y', 'z')
+
+Then, reverse:
+ 
+>>> new_iterable = pyjack.replace_all_refs(new_iterable, org_iterable)
+
+Then look at the new results
+ 
+>>> print "iterable:", iterable
+iterable: [1, 2, 3, 4, {'theiterable': [...]}]
+>>> print "SomeCls.someiterable:", SomeCls.someiterable
+SomeCls.someiterable: [1, 2, 3, 4, {'theiterable': [...]}]
+>>> print "SomeCls.anotheriterable:", SomeCls.anotheriterable
+SomeCls.anotheriterable: ([1, 2, 3, 4, {'theiterable': [...]}], 'x', 'y', 'z', {'innerref': [1, 2, 3, 4, {'theiterable': [...]}]})
+
+And inner fun, notice the function closure was updated:
+ 
+>>> innerfun_gen = innerfun()
+>>> print "First yield:", innerfun_gen.next()
+First yield: [1, 2, 3, 4, {'theiterable': [...]}]
+>>> print "Second yield:", innerfun_gen.next()
+Second yield: ([1, 2, 3, 4, {'theiterable': [...]}], 'x', 'y', 'z')
 
 Test sets / frozen sets
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

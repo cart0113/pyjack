@@ -41,8 +41,6 @@ or:
 
 * pyjacking :func:`time.time` to return integers for a unit test
 
-etc. 
-
 Basically, what does it do?
 ---------------------------
 
@@ -58,7 +56,7 @@ Basically, what does it do?
   :attr:`func_code`.  
   
 Updating the :attr:`func_code` is preferred because it is a fast, local 
-operation -- :func:`replace_all_refs` has to search entire memory space. So 
+operation -- :func:`replace_all_refs` has to call out to :mod:`gc`. So 
 the :attr:`func_code` approach is used whenever possible. 
   
 The overall idea of pyjack is to update *all* references in memory.  For 
@@ -74,18 +72,10 @@ example, code like this::
 only changes the one reference -- if other references to the original function
 or object exist, they are not updated. 
 
-Overall, it's kind of trivial module, but it's proven a useful from time to
-time. And while short, the exact mechanics of the recipe of how to replace 
-*all* references to a function / object in memory might be useful for someone 
+Overall, it's a bit of a experimental tool, but it's proven a useful from time 
+to time. And while short, the exact mechanics of the recipe of how to replace 
+all references to a function / object in memory might be useful for someone 
 looking to do something similar. 
-
-
-.. note::
-
-   :func:`connect` and :func:`replace_all_refs` can not work on objects in 
-   a :attr:`func_closure` since objects there are of :class:`cell` type and 
-   cannot be modified. 
-
    
 
 .. note::

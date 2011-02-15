@@ -10,8 +10,8 @@ if __name__ == '__main__':
 
 #>Prevent function from firing
 #>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#|Let's say you want to 1. monitor and 2. prevent every time something is 
-#|opening a file:
+#>Let's say you want to 1. monitor and 2. prevent every time something is 
+#>opening a file:
 import pyjack
 
 def fakeopen(orgopen, *args, **kwargs):
@@ -36,9 +36,9 @@ print min([-100, 20, -200, 150])
 #>Works across memory space
 #>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-#| A major point of pyjack is that all references to the object are updated / 
-#| pyjacked.  So notice below how :func:`time.time` is updated as well as the 
-#| local reference :attr:`timefn`.
+#>A major point of pyjack is that all references to the object are updated / 
+#>pyjacked.  So notice below how :func:`time.time` is updated as well as the 
+#>local reference :attr:`timefn`.
 
 import time
 from time import time as timefn
@@ -116,7 +116,7 @@ try:
 except pyjack.PyjackException, err:
     print err
 
-#|Do get around this you would need to do:
+#>Do get around this you would need to do:
 
 def my_init(self):
     pass
@@ -127,8 +127,8 @@ pyjack.connect(Foobar.__init__, proxyfn=in_init)
 
 Foobar()
 
-#|But by this point, you really don't need pyjack anymore anyway, but just 
-#|showing for completeness. 
+#>But by this point, you really don't need pyjack anymore anyway, but just 
+#>showing for completeness. 
 
 
 #>Works on callables that define :func:`__call__`
@@ -180,24 +180,17 @@ print adder(-4, 3)
 #>Using :func:`replace_all_refs`
 #>------------------------------------------------------------------------------
 
-#|This is just to show how :func:`replace_all_refs` works across a large, 
-#|nested memory space. 
+#>This is just to show how :func:`replace_all_refs` works across a large, 
+#>nested memory space. 
 
-#|.. note::
-#|  
-#|   Currently, pyjack does not work within function closures that use the
-#|   :class:`cell` readonly data structure. At this time, this is the only 
-#|   known exception. 
-
-#|Let's take a simple iterable
-
+#>Let's take a simple iterable
 iterable = [1, 2, 3, 4]
 
-#| And to really make it weird, make it circular: 
+#>And to make it weird, make it circular: 
 
 iterable.append({'theiterable': iterable})
 
-#| Now create a closure (pyjack can't work on closures, and we'll show that): 
+#>Now create a closure: 
 
 def myfun(iterable):
     
@@ -211,14 +204,14 @@ def myfun(iterable):
             
     return innerfun
 
-#| And stick it in a class, too: 
+#>And stick it in a class, too: 
 
 class SomeCls(object):
     
     iscls = True
     
     someiterable = iterable
-    anotheriterable = (iterable, 'x', 'y', 'z',)
+    anotheriterable = (iterable, 'x', 'y', 'z', {'innerref': someiterable})
 
 
 #>Now let's gander at some results: 
@@ -230,7 +223,7 @@ print "SomeCls.someiterable:", SomeCls.someiterable
 print "SomeCls.anotheriterable:", SomeCls.anotheriterable
 print "Contents of innerfun:"
 
-#|And inner fun: 
+#>And inner fun: 
 innerfun_gen = innerfun()
 print "First yield:", innerfun_gen.next()
 print "Second yield:", innerfun_gen.next()
@@ -244,16 +237,30 @@ print "iterable:", iterable
 print "SomeCls.someiterable:", SomeCls.someiterable
 print "SomeCls.anotheriterable:", SomeCls.anotheriterable
 
-#> And inner fun, notice pyjack here does not work: 
+#>And inner fun, notice the function closure was updated:
+innerfun_gen = innerfun()
+print "First yield:", innerfun_gen.next()
+print "Second yield:", innerfun_gen.next()
+
+#>Then, reverse:
+new_iterable = pyjack.replace_all_refs(new_iterable, org_iterable)
+
+#>Then look at the new results
+print "iterable:", iterable
+print "SomeCls.someiterable:", SomeCls.someiterable
+print "SomeCls.anotheriterable:", SomeCls.anotheriterable
+
+#>And inner fun, notice the function closure was updated:
 innerfun_gen = innerfun()
 print "First yield:", innerfun_gen.next()
 print "Second yield:", innerfun_gen.next()
 
 
+
 #>Test sets / frozen sets
 #>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-#> sets
+#>sets
 x = (10, 20, 30,)
 
 y = set([x, -1, -2])
@@ -263,7 +270,7 @@ org_x = pyjack.replace_all_refs(x, ('proxy', 'data',))
 print x
 print y
 
-#> Frozen sets
+#>Frozen sets
 x = (10, 20, 30,)
 
 y = frozenset([x, -1, -2])
@@ -304,7 +311,7 @@ for i in xrange(100000):
     else:
         mylist.append(random.randint(0, 1e6))
         
-#> Org list:
+#>Org list:
 print mylist[10000]
 print mylist[10001]
 print mylist[10002]
@@ -314,7 +321,7 @@ print mylist[50002]
 
 obj = pyjack.replace_all_refs(obj, [])
 
-#> New list:
+#>New list:
 print mylist[10000]
 print mylist[10001]
 print mylist[10002]
@@ -322,22 +329,7 @@ print mylist[50000]
 print mylist[50001]
 print mylist[50002]
 
-#> And final check:
+#>And final check:
 print obj
-
-
-
-
-
-
-    
-    
-    
-    
-
-
-
-
-
 
 

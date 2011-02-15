@@ -18,6 +18,11 @@ import inspect as _inspect
 
 _WRAPPER_TYPES = (type(object.__init__), type(object().__init__),)
 
+def proxy0(data):
+    def proxy1(): return data
+    return proxy1
+_CELLTYPE = type(proxy0(None).func_closure[0])
+
 
 class PyjackException(Exception): pass
 
@@ -83,6 +88,8 @@ def restore(fn):
 
 
 # SOMETHING BROKEN IN TYPES MODULE
+
+
 def replace_all_refs(org_obj, new_obj):
     """
     :summary: Uses the :mod:`gc` module to replace all references to obj
@@ -146,6 +153,7 @@ def replace_all_refs(org_obj, new_obj):
              
             cls = None
 
+            # THIS CODE HERE IS TO DEAL WITH DICTPROXY TYPES
             if '__dict__' in referrer and '__weakref__' in referrer:
                 for cls in _gc.get_referrers(referrer):
                     if _inspect.isclass(cls) and cls.__dict__ == referrer:
@@ -157,17 +165,17 @@ def replace_all_refs(org_obj, new_obj):
                     hit = True
                     value = new_obj
                     referrer[key] = value
-                    if cls:
+                    if cls: # AGAIN, CLEANUP DICTPROXY PROBLEM
                         setattr(cls, key, new_obj)
                 # AND KEYS.
                 if key is org_obj:
                     hit = True
-                    referrer[new_obj] = value
                     del referrer[key]
+                    referrer[new_obj] = value
                                                                         
         # LISTS
         elif isinstance(referrer, list):
-            for i, value in enumerate(referrer[:]):
+            for i, value in enumerate(referrer):
                 if value is org_obj:
                     hit = True
                     referrer[i] = new_obj
@@ -187,17 +195,32 @@ def replace_all_refs(org_obj, new_obj):
                 else:
                     new_tuple.append(obj)
             replace_all_refs(referrer, type(referrer)(new_tuple))
+
+        # CELLTYPE        
+        elif isinstance(referrer, _CELLTYPE):
+            def proxy0(data):
+                def proxy1(): return data
+                return proxy1
+            proxy = proxy0(new_obj)
+            newcell = proxy.func_closure[0]
+            replace_all_refs(referrer, newcell)            
         
-        elif str(type(referrer)).lower() ==  "<type 'cell'>":
-            # TODO: CRACK THE SECRET 'cell' CASE
-            #print type(referrer).__module__
-            #type(referrer)(cell_list=org_obj)
-            #print referrer
-            #for x in _gc.get_referrers(referrer):
-            #    if not isinstance(x, _types.FrameType):
-            #        print 'hi', type(x)
-            #raise SystemExit
-            pass
+        # FUNCTIONS
+        elif isinstance(referrer, _types.FunctionType):
+            localsmap = {}
+            for key in ['func_code', 'func_globals', 'func_name', 
+                        'func_defaults', 'func_closure']:
+                orgattr = getattr(referrer, key)
+                if orgattr is org_obj:
+                    localsmap[key.split('func_')[-1]] = new_obj
+                else:
+                    localsmap[key.split('func_')[-1]] = orgattr
+            localsmap['argdefs'] = localsmap['defaults']
+            del localsmap['defaults']
+            newfn = _types.FunctionType(**localsmap)
+            replace_all_refs(referrer, newfn)
+
+        # OTHER (IN DEBUG, SEE WHAT IS NOT SUPPORTED). 
         else:
             # debug: 
             # print type(referrer)

@@ -9,8 +9,9 @@ setup(
     version = "0.3.1",
     author = "Andrew Carter",
     author_email = "andrewjcarter@gmail.com",
-    description = ("Tools to attach spy functions to functions and replace "
-                   "object references with new references"),
+    description = ("Tools to reversibly replace functions / objects with "
+                   "proxy functions / objects for debug, testing, "
+                   "monkey-patching."),
     license = "MIT",
     keywords = "debug callback test monkey monkey-patch",
     url = "http://packages.python.org/pyjack/",
