@@ -8,7 +8,7 @@ r'''
 ...     
 ...     return 'MODULE_%s' % args[0]
 ... 
->>> pyjack.connect(__import__, spyfn=fakeimport)
+>>> pyjack.connect(__import__, proxyfn=fakeimport)
 <..._PyjackFuncBuiltin object at 0x...>
 >>> 
 >>> import time

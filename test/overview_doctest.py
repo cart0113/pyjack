@@ -14,13 +14,13 @@ opening a file:
 ...     print 'Someone trying to open a file with args:%r kwargs%r' %(args, kwargs,)
 ...     return ()
 ... 
->>> pyjack.connect(open, spyfn=fakeopen)
+>>> pyjack.connect(open, proxyfn=fakeopen)
 <..._PyjackFuncBuiltin object at 0x...>
 >>> 
 >>> for line in open('/some/path', 'r'):
 ...     print line
 ... 
-Here is the org open fn: <built-in function open>
+Here is the org open fn: <type 'file'>
 Someone trying to open a file with args:('/some/path', 'r') kwargs{}
 
 Filtering args
@@ -29,7 +29,7 @@ Filtering args
 >>> def absmin(orgmin, seq):
 ...     return orgmin([abs(x) for x in seq])
 ... 
->>> pyjack.connect(min, spyfn=absmin)
+>>> pyjack.connect(min, proxyfn=absmin)
 <..._PyjackFuncBuiltin object at 0x...>
 >>> 
 >>> print min([-100, 20, -200, 150])
@@ -77,7 +77,7 @@ local reference :attr:`timefn`.
 >>> print timefn()
 7
 
-Works on objects (but not slot wrappers)
+Works on object methods (but not slot wrappers)
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
  
@@ -88,19 +88,45 @@ Works on objects (but not slot wrappers)
 >>> 
 >>> foobar = Foobar()
 >>> 
->>> foobar.say_hi()
-'hi'
+>>> print foobar.say_hi()
+hi
 >>> 
 >>> pyjack.connect(Foobar.say_hi, lambda orgfn, self: 'HI')
 <...function say_hi at 0x...>
 >>> 
->>> foobar.say_hi()
-'HI'
->>> 
+>>> print foobar.say_hi()
+HI
+
+And restore: 
+ 
 >>> Foobar.say_hi.restore()
 >>> 
->>> foobar.say_hi()
-'hi'
+>>> print foobar.say_hi()
+hi
+
+Test that you can't remove restore again: 
+ 
+>>> try:
+...     foobar.say_hi.restore()
+... except AttributeError:
+...     print "'say_hi' has already been restored, so there's no more restore fn"
+
+Cycle connect/restore to make sure everything is working
+ 
+>>> pyjack.connect(Foobar.say_hi, lambda orgfn, self: 'HI')
+<...function say_hi at 0x...>
+>>> print foobar.say_hi()
+HI
+>>> Foobar.say_hi.restore()
+>>> print foobar.say_hi()
+hi
+>>> pyjack.connect(Foobar.say_hi, lambda orgfn, self: 'HI')
+<...function say_hi at 0x...>
+>>> print foobar.say_hi()
+HI
+>>> Foobar.say_hi.restore()
+>>> print foobar.say_hi()
+hi
 
 Does not work on slot wrappers (like builtin :func:`__init__`, etc.) 
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -110,7 +136,7 @@ Does not work on slot wrappers (like builtin :func:`__init__`, etc.)
 ...     print 'in __init__'
 ... 
 >>> try:
-...     pyjack.connect(Foobar.__init__, spyfn=in_init)
+...     pyjack.connect(Foobar.__init__, proxyfn=in_init)
 ... except pyjack.PyjackException, err:
 ...     print err
 ... 
@@ -124,7 +150,7 @@ Do get around this you would need to do:
 ... 
 >>> Foobar.__init__ = my_init
 >>> 
->>> pyjack.connect(Foobar.__init__, spyfn=in_init)
+>>> pyjack.connect(Foobar.__init__, proxyfn=in_init)
 <...function my_init at 0x...>
 >>> 
 >>> Foobar()
@@ -135,6 +161,68 @@ But by this point, you really don't need pyjack anymore anyway, but just
 showing for completeness. 
 
  
+
+Works on callables that define :func:`__call__`
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+ 
+>>> class Adder(object):
+...     
+...     def __call__(self, x, y):
+...         return x + y
+... 
+>>> adder = Adder()
+>>> 
+>>> print adder(-4, 3)
+-1
+
+Now connect lambda fn which takes abs of all args
+ 
+>>> pyjack.connect(fn=adder, proxyfn=lambda self, fn, x, y: fn(abs(x), abs(y)))
+<...Adder object at 0x...>
+>>> 
+>>> print adder(-4, 3)
+7
+
+Now restore: 
+ 
+>>> adder.restore()
+>>> 
+>>> print adder(-4, 3)
+-1
+
+Remember, restore removes the :func:`restore`
+ 
+>>> try:
+...     adder.restore()
+... except AttributeError:
+...     print "'adder' has already been restored, so there's no more restore fn"
+... 
+'adder' has already been restored, so there's no more restore fn
+
+Now, as part of unit test, just make sure you can connect / restore / connect
+ 
+>>> pyjack.connect(fn=adder, proxyfn=lambda self, fn, x, y: fn(abs(x), abs(y)))
+<...Adder object at 0x...>
+>>> 
+>>> print adder(-4, 3)
+7
+>>> 
+>>> adder.restore()
+>>> 
+>>> print adder(-4, 3)
+-1
+>>> 
+>>> pyjack.connect(fn=adder, proxyfn=lambda self, fn, x, y: fn(abs(x), abs(y)))
+<...Adder object at 0x...>
+>>> 
+>>> print adder(-4, 3)
+7
+>>> 
+>>> adder.restore()
+>>> 
+>>> print adder(-4, 3)
+-1
 
 Using :func:`replace_all_refs`
 ------------------------------------------------------------------------------
@@ -228,18 +316,56 @@ First yield: [1, 2, 3, 4, {'theiterable': ('new', 'data', 'set')}]
 >>> print "Second yield:", innerfun_gen.next()
 Second yield: ([1, 2, 3, 4, {'theiterable': ('new', 'data', 'set')}], 'x', 'y', 'z')
 
+Test sets / frozen sets
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+sets
+ 
+>>> x = (10, 20, 30,)
+>>> 
+>>> y = set([x, -1, -2])
+>>> 
+>>> org_x = pyjack.replace_all_refs(x, ('proxy', 'data',))
+>>> 
+>>> print x
+('proxy', 'data')
+>>> print y
+set([('proxy', 'data'), -2, -1])
+
+Frozen sets
+ 
+>>> x = (10, 20, 30,)
+>>> 
+>>> y = frozenset([x, -1, -2])
+>>> 
+>>> org_x = pyjack.replace_all_refs(x, ('proxy', 'data',))
+>>> 
+>>> print x
+('proxy', 'data')
+>>> print y
+frozenset([('proxy', 'data'), -2, -1])
+
+Test dictionary
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+ 
+>>> x = (10, 20, 30,)
+>>> 
+>>> y = {x: [1, 2, 3, {x: [1, x]}]}
+>>> 
+>>> org_x = pyjack.replace_all_refs(x, ('proxy', 'data',))
+>>> 
+>>> print x
+('proxy', 'data')
+>>> print y
+{('proxy', 'data'): [1, 2, 3, {('proxy', 'data'): [1, ('proxy', 'data')]}]}
+
 Some bigger examples to make sure :mod:`gc` does not implode
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  
 >>> import random
-Traceback (most recent call last):
-    ...
-NameError: name 'OverflowWarning' is not defined
 >>> 
 >>> random = random.Random(0)
-Traceback (most recent call last):
-    ...
-NameError: name 'random' is not defined
 >>> 
 >>> obj = {'x': 10, 'y': [10, 20, 30,]}
 >>> 
@@ -253,66 +379,38 @@ NameError: name 'random' is not defined
 ...         mylist.append((obj, obj,))
 ...     else:
 ...         mylist.append(random.randint(0, 1e6))
-... 
-Traceback (most recent call last):
-    ...
-NameError: name 'random' is not defined
 
 Org list:
  
 >>> print mylist[10000]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+{'y': [10, 20, 30], 'x': 10}
 >>> print mylist[10001]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+({'y': [10, 20, 30], 'x': 10}, {'y': [10, 20, 30], 'x': 10})
 >>> print mylist[10002]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+618969
 >>> print mylist[50000]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+{'y': [10, 20, 30], 'x': 10}
 >>> print mylist[50001]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+({'y': [10, 20, 30], 'x': 10}, {'y': [10, 20, 30], 'x': 10})
 >>> print mylist[50002]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+357697
 >>> 
 >>> obj = pyjack.replace_all_refs(obj, [])
 
 New list:
  
 >>> print mylist[10000]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+[]
 >>> print mylist[10001]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+([], [])
 >>> print mylist[10002]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+618969
 >>> print mylist[50000]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+[]
 >>> print mylist[50001]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+([], [])
 >>> print mylist[50002]
-Traceback (most recent call last):
-    ...
-IndexError: list index out of range
+357697
 
 And final check:
  

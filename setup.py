@@ -6,7 +6,7 @@ def read(fname):
 
 setup(
     name = "pyjack",
-    version = "0.3.0",
+    version = "0.3.1",
     author = "Andrew Carter",
     author_email = "andrewjcarter@gmail.com",
     description = ("Tools to attach spy functions to functions and replace "

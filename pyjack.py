@@ -1,3 +1,15 @@
+"""\
+pyjack
+******
+
+pyjack is debug/test/monkey-patching toolset that allows you to reversibly
+replace all references to a function /object in memory with a 
+proxy function/object.  
+
+:copyright: Copyright 2009-2012 by Andrew Carter <andrewjcarter@gmail.com>
+:license: MIT (http://www.opensource.org/licenses/mit-license.php)
+
+"""
 import sys as _sys
 import gc as _gc
 import types as _types
@@ -10,48 +22,53 @@ _WRAPPER_TYPES = (type(object.__init__), type(object().__init__),)
 class PyjackException(Exception): pass
 
 
-def connect(fn, spyfn):    
-    """
+def connect(fn, proxyfn):    
+    """\
     :summary: Connects a filter/callback function to a function/method.
                       
     :param fn: The function which to pyjack.
     :type fn:  :class:`types.FunctionType`, :class:`types.MethodType`, 
-               :class:`types.BuiltinFunctionType`, or
-               :class:`BuiltinMethodType` functions. 
+               :class:`types.BuiltinFunctionType`, :class:`BuiltinMethodType` 
+               or any callable that implements :func:`__call__`
         
-    :param spyfn: Any callable.  It will be passed the orignal :attr:`fn`
-                  and then any args, kwargs that were passed to the 
-                  original :attr:`fn`. 
-    :type spyfn:  callable. 
+    :param proxyfn: Any callable.  It will be passed the original :attr:`fn`
+                    and then any args, kwargs that were passed to the 
+                    original :attr:`fn`. 
+    :type proxyfn:  callable. 
         
     :returns: The new pyjacked function.  Note, this function object
               has a :func:`restore` that can be called to remove the
               pyjack filters/callbacks. 
                       
     :raises: :class:`PyjackException`
-
-    """
-    
+    """    
     fn_type = type(fn)
     if issubclass(fn_type, _types.FunctionType):
-        return _PyjackFuncCode(fn, spyfn)._fn
+        return _PyjackFuncCode(fn, proxyfn)._fn
     elif issubclass(fn_type, _types.MethodType):
-        return _PyjackFuncCode(fn.im_func, spyfn)._fn
+        return _PyjackFuncCode(fn.im_func, proxyfn)._fn
     elif issubclass(fn_type, (_types.BuiltinFunctionType, 
                               _types.BuiltinMethodType,)):
-        return _PyjackFuncBuiltin(fn, spyfn)
-    elif issubclass(fn_type, _WRAPPER_TYPES):
-        raise PyjackException("Wrappers not supported. Make a concrete fn.")
+        return _PyjackFuncBuiltin(fn, proxyfn)
     elif _sys.version_info < (2, 5) and issubclass(fn_type, type(file)):
         # in python 2.4, open is of type file, not :class:`types.FunctionType`
-        return _PyjackFuncBuiltin(fn, spyfn)
+        return _PyjackFuncBuiltin(fn, proxyfn)
+    elif issubclass(fn_type, _WRAPPER_TYPES):
+        raise PyjackException("Wrappers not supported. Make a concrete fn.")
+    elif isinstance(getattr(fn, '__call__', None), _types.MethodType):
+        _PyjackFuncCode(fn.__call__.im_func, proxyfn)
+        def restore():
+            fn.__call__.im_func.restore()
+            delattr(fn, 'restore')
+        fn.restore = restore
+        return fn
     else:
         bundle = (fn, fn_type,)
         raise PyjackException("fn %r of type '%r' not supported" % bundle)
     
 
 def restore(fn):
-    """
+    """\
     :summary:  Fully restores function back to original state. 
                       
     :param fn: The pyjacked function returned by :func:`connect`. 
@@ -119,10 +136,14 @@ def replace_all_refs(org_obj, new_obj):
     
     hit = False    
     for referrer in _gc.get_referrers(org_obj):
+                
+        # FRAMES -- PASS THEM UP
+        if isinstance(referrer, _types.FrameType):
+            continue
 
         # DICTS
         if isinstance(referrer, dict):
-
+             
             cls = None
 
             if '__dict__' in referrer and '__weakref__' in referrer:
@@ -131,13 +152,19 @@ def replace_all_refs(org_obj, new_obj):
                         break
             
             for key, value in referrer.items():
+                # REMEMBER TO REPLACE VALUES ...
                 if value is org_obj:
                     hit = True
-                    referrer[key] = new_obj
+                    value = new_obj
+                    referrer[key] = value
                     if cls:
                         setattr(cls, key, new_obj)
-                        
-                                                
+                # AND KEYS.
+                if key is org_obj:
+                    hit = True
+                    referrer[new_obj] = value
+                    del referrer[key]
+                                                                        
         # LISTS
         elif isinstance(referrer, list):
             for i, value in enumerate(referrer[:]):
@@ -151,6 +178,7 @@ def replace_all_refs(org_obj, new_obj):
             referrer.add(new_obj)
             hit = True
 
+        # TUPLE, FROZENSET
         elif isinstance(referrer, (tuple, frozenset,)):
             new_tuple = []
             for obj in referrer:
@@ -161,13 +189,19 @@ def replace_all_refs(org_obj, new_obj):
             replace_all_refs(referrer, type(referrer)(new_tuple))
         
         elif str(type(referrer)).lower() ==  "<type 'cell'>":
+            # TODO: CRACK THE SECRET 'cell' CASE
             #print type(referrer).__module__
             #type(referrer)(cell_list=org_obj)
+            #print referrer
             #for x in _gc.get_referrers(referrer):
-            #    print x
+            #    if not isinstance(x, _types.FrameType):
+            #        print 'hi', type(x)
+            #raise SystemExit
             pass
-        elif not isinstance(referrer, _types.FrameType):
-            print referrer
+        else:
+            # debug: 
+            # print type(referrer)
+            pass
             
     if hit is False:
         raise AttributeError("Object '%r' not found" % org_obj)
@@ -190,11 +224,11 @@ class _PyjackFunc(object): pass
 
 class _PyjackFuncCode(_PyjackFunc):
             
-    def __init__(self, fn, spyfn):
+    def __init__(self, fn, proxyfn):
 
         global _func_code_map
                 
-        self._fn, self._spyfn = fn, spyfn
+        self._fn, self._proxyfn = fn, proxyfn
               
         def proxy(*args, **kwargs):
             import pyjack
@@ -210,7 +244,7 @@ class _PyjackFuncCode(_PyjackFunc):
 
     def _process_fn(self, args, kwargs):
         self._fn.func_code = self._org_func_code
-        value = self._spyfn(self._fn, *args, **kwargs)
+        value = self._proxyfn(self._fn, *args, **kwargs)
         self._fn.func_code = self._proxy_func_code
         return value
     
@@ -220,12 +254,12 @@ class _PyjackFuncCode(_PyjackFunc):
 
 class _PyjackFuncBuiltin(_PyjackFunc):
         
-    def __init__(self, fn, spyfn):
+    def __init__(self, fn, proxyfn):
         self._fn = replace_all_refs(fn, self)
-        self._spyfn = spyfn
+        self._proxyfn = proxyfn
 
     def __call__(self, *args, **kwargs):
-        return self._spyfn(self._fn, *args, **kwargs)
+        return self._proxyfn(self._fn, *args, **kwargs)
                 
     def __getattr__(self, attr):
         try:
@@ -236,7 +270,7 @@ class _PyjackFuncBuiltin(_PyjackFunc):
     
     def restore(self):
         replace_all_refs(self, self._fn)
-        
+            
 
 if __name__ == '__main__':
     

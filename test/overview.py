@@ -1,6 +1,6 @@
-if __name__ == '__main__d':
+if __name__ == '__main__':
     import mod2doctest
-    mod2doctest.convert(r'C:\Python26\python.exe', src=True,
+    mod2doctest.convert(r'C:\Python24\python.exe', src=True,
                         add_autogen=False, target='_doctest',
                         run_doctest=False,)
     
@@ -19,7 +19,7 @@ def fakeopen(orgopen, *args, **kwargs):
     print 'Someone trying to open a file with args:%r kwargs%r' %(args, kwargs,)
     return ()
 
-pyjack.connect(open, spyfn=fakeopen)
+pyjack.connect(open, proxyfn=fakeopen)
 
 for line in open('/some/path', 'r'):
     print line
@@ -29,7 +29,7 @@ for line in open('/some/path', 'r'):
 def absmin(orgmin, seq):
     return orgmin([abs(x) for x in seq])
     
-pyjack.connect(min, spyfn=absmin)
+pyjack.connect(min, proxyfn=absmin)
 
 print min([-100, 20, -200, 150])
 
@@ -67,7 +67,7 @@ print timefn()
 print timefn()
 
 
-#>Works on objects (but not slot wrappers)
+#>Works on object methods (but not slot wrappers)
 #>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 class Foobar(object):
@@ -78,15 +78,32 @@ class Foobar(object):
 
 foobar = Foobar()
 
-foobar.say_hi()
+print foobar.say_hi()
 
 pyjack.connect(Foobar.say_hi, lambda orgfn, self: 'HI')
 
-foobar.say_hi()
+print foobar.say_hi()
 
+#>And restore: 
 Foobar.say_hi.restore()
 
-foobar.say_hi()
+print foobar.say_hi()
+
+#>Test that you can't remove restore again: 
+try:
+    foobar.say_hi.restore()
+except AttributeError: 
+    print "'say_hi' has already been restored, so there's no more restore fn"
+
+#>Cycle connect/restore to make sure everything is working
+pyjack.connect(Foobar.say_hi, lambda orgfn, self: 'HI')
+print foobar.say_hi()
+Foobar.say_hi.restore()
+print foobar.say_hi()
+pyjack.connect(Foobar.say_hi, lambda orgfn, self: 'HI')
+print foobar.say_hi()
+Foobar.say_hi.restore()
+print foobar.say_hi()
 
 #>Does not work on slot wrappers (like builtin :func:`__init__`, etc.) 
 #>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -95,7 +112,7 @@ def in_init(orgfn, self):
     print 'in __init__'
 
 try: 
-    pyjack.connect(Foobar.__init__, spyfn=in_init)
+    pyjack.connect(Foobar.__init__, proxyfn=in_init)
 except pyjack.PyjackException, err:
     print err
 
@@ -106,12 +123,58 @@ def my_init(self):
 
 Foobar.__init__ = my_init
 
-pyjack.connect(Foobar.__init__, spyfn=in_init)
+pyjack.connect(Foobar.__init__, proxyfn=in_init)
 
 Foobar()
 
 #|But by this point, you really don't need pyjack anymore anyway, but just 
 #|showing for completeness. 
+
+
+#>Works on callables that define :func:`__call__`
+#>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+class Adder(object):
+    
+    def __call__(self, x, y):
+        return x + y
+
+adder = Adder()
+
+print adder(-4, 3)
+
+#>Now connect lambda fn which takes abs of all args
+pyjack.connect(fn=adder, proxyfn=lambda self, fn, x, y: fn(abs(x), abs(y)))
+
+print adder(-4, 3)
+
+#>Now restore: 
+adder.restore()
+
+print adder(-4, 3)
+
+#>Remember, restore removes the :func:`restore`
+try:
+    adder.restore()
+except AttributeError: 
+    print "'adder' has already been restored, so there's no more restore fn"
+
+#>Now, as part of unit test, just make sure you can connect / restore / connect
+pyjack.connect(fn=adder, proxyfn=lambda self, fn, x, y: fn(abs(x), abs(y)))
+
+print adder(-4, 3)
+
+adder.restore()
+
+print adder(-4, 3)
+
+pyjack.connect(fn=adder, proxyfn=lambda self, fn, x, y: fn(abs(x), abs(y)))
+
+print adder(-4, 3)
+
+adder.restore()
+
+print adder(-4, 3)
 
 
 #>Using :func:`replace_all_refs`
@@ -186,6 +249,41 @@ innerfun_gen = innerfun()
 print "First yield:", innerfun_gen.next()
 print "Second yield:", innerfun_gen.next()
 
+
+#>Test sets / frozen sets
+#>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+#> sets
+x = (10, 20, 30,)
+
+y = set([x, -1, -2])
+
+org_x = pyjack.replace_all_refs(x, ('proxy', 'data',))
+
+print x
+print y
+
+#> Frozen sets
+x = (10, 20, 30,)
+
+y = frozenset([x, -1, -2])
+
+org_x = pyjack.replace_all_refs(x, ('proxy', 'data',))
+
+print x
+print y
+
+#>Test dictionary
+#>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+x = (10, 20, 30,)
+
+y = {x: [1, 2, 3, {x: [1, x]}]}
+
+org_x = pyjack.replace_all_refs(x, ('proxy', 'data',))
+
+print x
+print y
 
 #>Some bigger examples to make sure :mod:`gc` does not implode
 #>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

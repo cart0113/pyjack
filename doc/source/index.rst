@@ -8,24 +8,32 @@ pyjack
 
 .. sectionauthor:: Andrew Carter <andrewjcarter@gmail.com>.
 
-The :mod:`pyjack` is a small debug / test module that allows you to: 
+pyjack is a debug/test/monkey-patching toolset that allows you to reversibly
+replace *all* references to a function or object in memory with a 
+proxy function or object. pyjack's has two major functions: 
 
-* Connect a 'spy' function to almost any python function.  This spy function
-  is called instead of the original function.  The original function is passed
-  to the spy function along with all args, kwargs so you can call the original
-  function; modify the args, kwargs first, print a debug message, then call it; 
-  not call the function, just log it or print a debug message; etc. etc.   
+* :func:`connect` can connect a 'proxy' function to almost 
+  any python function/method.  This proxy function is called instead of the 
+  original function.  However, the original function is passed to the proxy 
+  function along with all args, kwargs so you can do things like:
   
-* Provides a convenience function :func:`replace_all_refs` which can be used
-  to replace all references to a object with references to another objects. 
+  - Modify the args, kwargs first, print a debug message, then call the original
+    function
+  - Not call the function, rather just log it and print a debug message
+   
+  etc. etc. -- it's all up to you. 
+  
+* :func:`replace_all_refs` can be used to replace all 
+  references to a object with references to another object. This replaces all 
+  references in the _entire_ memory space. 
 
 Here's a quick example: 
 
 .. automodule:: quickexample_doctest
   
-Overall, the main purpose of pyjack is for debugging, unit testing, etc.  For
-example: 
-
+Overall, the main purpose of pyjack is for debugging, unit testing, general
+purpose monkey-patching, etc.  For example: 
+a
 * using pyjack to pyjack :func:`__import__` to see what modules are 
   being imported 
   
@@ -45,12 +53,13 @@ Basically, what does it do?
   This is done so *all* references to the function are altered. 
   
 * For builtin functions, the :func:`replace_all_refs` is used.  This function
-  uses the :mod:`gc` module to search for all references. This is because 
-  you can't tinker with a builtin functions :attr:`func_code`.  
+  uses the :mod:`gc` module to search for all references in the entire memory
+  space. This is because you can't tinker with a builtin function's 
+  :attr:`func_code`.  
   
 Updating the :attr:`func_code` is preferred because it is a fast, local 
 operation -- :func:`replace_all_refs` has to search entire memory space. So 
-the :attr:`func_code` approach is used when possible. 
+the :attr:`func_code` approach is used whenever possible. 
   
 The overall idea of pyjack is to update *all* references in memory.  For 
 example, code like this::
@@ -62,11 +71,11 @@ example, code like this::
     
     time.time = faketime
     
-only changes the one reference -- if other references to the original functions
-or objects exist, they are not updated. 
+only changes the one reference -- if other references to the original function
+or object exist, they are not updated. 
 
-Overall, It's kind of trivial module, but it's proven a useful from time to
-time. And while short, the exact mechanics of the receipe of how to replace 
+Overall, it's kind of trivial module, but it's proven a useful from time to
+time. And while short, the exact mechanics of the recipe of how to replace 
 *all* references to a function / object in memory might be useful for someone 
 looking to do something similar. 
 
@@ -82,7 +91,7 @@ looking to do something similar.
 .. note::
 
    Should it be used in so called "production code"?  Well, the :mod:`inspect` 
-   module and the :mod:`gc` module and used and some low level objects 
+   module and the :mod:`gc` module are used and some low level object 
    attributes are tinkered with.  So you get the idea: use at your own risk 
    (but isn't that always the case?).  
      
@@ -127,3 +136,4 @@ Indices and Tables
 ==================
 * :ref:`genindex`
 * :ref:`search`
+    

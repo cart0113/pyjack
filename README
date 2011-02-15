@@ -1,17 +1,24 @@
 pyjack
 ======
 
-pyjack is a small debug / test module that allows you to: 
+pyjack is a debug/test/monkey-patching toolset that allows you to reversibly
+replace *all* references to a function or object in memory with a 
+proxy function or object. pyjack's has two major functions: 
 
-* Connect a 'spy' function to almost any python function.  This spy function
-  is called instead of the original function.  The original function is passed
-  to the spy function along with all args, kwargs so you can call the original
-  function; modify the args, kwargs first, print a debug message, then call it; 
-  not call the function, just log it or print a debug message; etc. etc.   
+* function "connect" can connect a 'proxy' function to almost 
+  any python function/method.  This proxy function is called instead of the 
+  original function.  However, the original function is passed to the proxy 
+  function along with all args, kwargs so you can do things like:
   
-* Provides a convenience function pyjack.replace_all_refs which uses the gc
-  module to replace all references to an object with references to another 
-  object. 
+  - Modify the args, kwargs first, print a debug message, then call the original
+    function
+  - Not call the function, rather just log it and print a debug message
+   
+  etc. etc. -- it's all up to you. 
+  
+* function "replace_all_refs" can be used to replace all 
+  references to a object with references to another object. This replaces all 
+  references in the _entire_ memory space. 
 
 A quick example::
 
@@ -25,7 +32,7 @@ A quick example::
     ... 
     >>>
     >>>
-    >>> pyjack.connect(__import__, spyfn=fakeimport)
+    >>> pyjack.connect(__import__, proxyfn=fakeimport)
     <..._PyjackFuncBuiltin object at 0x...>
     >>> 
     >>>
@@ -44,9 +51,12 @@ A quick example::
     <module 'time' (built-in)>
 
     
-For full documentation and several examples please visit 
-http://packages.python.org/pyjack/.
+For full documentation and several examples please visit: 
 
-The git repo is here: https://github.com/cart0113/pyjack 
+* http://packages.python.org/pyjack/
+
+The git repo is here: 
+
+* https://github.com/cart0113/pyjack 
  
  
