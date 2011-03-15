@@ -6,7 +6,7 @@ def read(fname):
 
 setup(
     name = "pyjack",
-    version = "0.3.1",
+    version = "0.3.2",
     author = "Andrew Carter",
     author_email = "andrewjcarter@gmail.com",
     description = ("Tools to reversibly replace functions / objects with "

@@ -31,16 +31,6 @@ Here's a quick example:
 
 .. automodule:: quickexample_doctest
   
-Overall, the main purpose of pyjack is for debugging, unit testing, general
-purpose monkey-patching, etc.  For example: 
-a
-* using pyjack to pyjack :func:`__import__` to see what modules are 
-  being imported 
-  
-or:  
-
-* pyjacking :func:`time.time` to return integers for a unit test
-
 Basically, what does it do?
 ---------------------------
 

@@ -52,8 +52,9 @@ def connect(fn, proxyfn):
         return _PyjackFuncCode(fn, proxyfn)._fn
     elif issubclass(fn_type, _types.MethodType):
         return _PyjackFuncCode(fn.im_func, proxyfn)._fn
-    elif issubclass(fn_type, (_types.BuiltinFunctionType, 
-                              _types.BuiltinMethodType,)):
+    elif issubclass(fn_type, (_types.BuiltinFunctionType,
+                              _types.BuiltinMethodType,
+                              type)):
         return _PyjackFuncBuiltin(fn, proxyfn)
     elif _sys.version_info < (2, 5) and issubclass(fn_type, type(file)):
         # in python 2.4, open is of type file, not :class:`types.FunctionType`
