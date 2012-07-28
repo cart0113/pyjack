@@ -64,8 +64,8 @@ def connect(fn, proxyfn):
     elif isinstance(getattr(fn, '__call__', None), _types.MethodType):
         _PyjackFuncCode(fn.__call__.im_func, proxyfn)
         def restore():
-            fn.__call__.im_func.restore()
             delattr(fn, 'restore')
+            fn.__call__.im_func.restore()
         fn.restore = restore
         return fn
     else:
@@ -268,11 +268,14 @@ class _PyjackFuncCode(_PyjackFunc):
 
     def _process_fn(self, args, kwargs):
         self._fn.func_code = self._org_func_code
-        value = self._proxyfn(self._fn, *args, **kwargs)
-        self._fn.func_code = self._proxy_func_code
-        return value
+        try:
+            return self._proxyfn(self._fn, *args, **kwargs)
+        finally:
+            if hasattr(self._fn, 'restore'):
+                self._fn.func_code = self._proxy_func_code
     
     def restore(self):
+        delattr(self._fn, 'restore')
         self._fn.func_code = self._org_func_code
         
 
