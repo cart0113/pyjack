@@ -21,7 +21,10 @@ _WRAPPER_TYPES = (type(object.__init__), type(object().__init__),)
 def proxy0(data):
     def proxy1(): return data
     return proxy1
-_CELLTYPE = type(proxy0(None).func_closure[0])
+if _sys.version_info[0] < 3:
+    _CELLTYPE = type(proxy0(None).func_closure[0])
+else:
+    _CELLTYPE = type(proxy0(None).__closure__[0])
 
 
 class PyjackException(Exception): pass
